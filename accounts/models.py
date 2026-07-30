@@ -20,3 +20,18 @@ class StudentProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Profile ({self.field})"
+
+
+class Friendship(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friendships', verbose_name="USER")
+    friend = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friend_of', verbose_name="Friend")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # جلوگیری از اضافه کردن تکراری یک دوست
+        unique_together = ('user', 'friend')
+        verbose_name = 'Friendship'
+        verbose_name_plural = 'Friends'
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.friend.username}"

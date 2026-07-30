@@ -122,7 +122,18 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# اجازه دادن به درخواست‌های فرانت‌اند (Next.js)
+# اضافه کردن تنظیمات REST Framework برای پشتیبانی از JWT
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+# تنظیمات CORS برای ارتباط با Next.js
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",

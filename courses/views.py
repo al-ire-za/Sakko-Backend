@@ -1,7 +1,7 @@
 from rest_framework.generics import ListCreateAPIView
+from rest_framework.permissions import IsAuthenticated
 from .models import Course
 from .serializers import CourseSerializer
-from rest_framework.permissions import IsAuthenticated
 
 class CourseListAPIView(ListCreateAPIView):
     queryset = Course.objects.all()
