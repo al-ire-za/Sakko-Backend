@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 # ۱. مدل کارهای دفترچه برنامه‌ریزی
 class Task(models.Model):
@@ -25,7 +26,7 @@ class StudySession(models.Model):
     start_time = models.TimeField(verbose_name="Start Time")
     end_time = models.TimeField(verbose_name="End Time")
     test_count = models.PositiveIntegerField(default=0, verbose_name="Test Count")
-    date = models.DateField(auto_now_add=True, verbose_name="Date")
+    date = models.DateField(default=timezone.now, verbose_name="Date")
 
     class Meta:
         verbose_name = "Study Session"
@@ -49,3 +50,26 @@ class DailySleepLog(models.Model):
 
     def __str__(self):
         return f"{self.user.username} Sleep Log ({self.date})"
+
+# مدل ساختگی فقط برای تغییر ظاهر ادمین
+class UserTaskGroup(User):
+    class Meta:
+        proxy = True
+        verbose_name = "Task"
+        verbose_name_plural = "Tasks"
+
+
+# مدل ساختگی برای گروه‌بندی پارت‌های مطالعه بر اساس کاربر
+class UserStudyGroup(User):
+    class Meta:
+        proxy = True
+        verbose_name = "Study Session"
+        verbose_name_plural = "Study Sessions"
+
+
+# مدل ساختگی برای گروه‌بندی خواب کاربران
+class UserSleepGroup(User):
+    class Meta:
+        proxy = True
+        verbose_name = "Daily Sleep Log"
+        verbose_name_plural = "Daily Sleep Log"
