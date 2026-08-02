@@ -26,7 +26,7 @@ class StudySession(models.Model):
     start_time = models.TimeField(verbose_name="Start Time")
     end_time = models.TimeField(verbose_name="End Time")
     test_count = models.PositiveIntegerField(default=0, verbose_name="Test Count")
-    date = models.DateField(default=timezone.now, verbose_name="Date")
+    date = models.DateField(default=timezone.localdate, verbose_name="Date")
 
     class Meta:
         verbose_name = "Study Session"
