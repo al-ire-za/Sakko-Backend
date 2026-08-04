@@ -2,9 +2,24 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Course(models.Model):
+    # ۱. تعریف انواع مخاطبین دوره
+    class TargetAudience(models.TextChoices):
+        STUDENT = 'student', 'دانش‌آموز'
+        CONSULTANT = 'consultant', 'مشاور'
+        PUBLIC = 'public', 'عمومی'
+
     title = models.CharField(max_length=200, verbose_name="Course Title")
     description = models.TextField(blank=True, verbose_name="Description")
     instructor = models.CharField(max_length=100, blank=True, verbose_name="Instructor")
+    
+    # ۲. اضافه کردن فیلد مخاطب دوره
+    target_audience = models.CharField(
+        max_length=20,
+        choices=TargetAudience.choices,
+        default=TargetAudience.PUBLIC,
+        verbose_name="Target Audience"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     icon_name = models.CharField(max_length=50, default='BookOpen', verbose_name="Icon Name")
@@ -16,10 +31,9 @@ class Course(models.Model):
         verbose_name_plural = "Courses"
 
     def __str__(self):
-        return self.title
+        return f"{self.title} ({self.get_target_audience_display()})"
 
 
-# ثبت‌نام یا دسترسی دانش‌آموز به دوره
 class Enrollment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments', verbose_name="User")
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments', verbose_name="Course")

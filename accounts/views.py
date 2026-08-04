@@ -1,27 +1,33 @@
 from django.shortcuts import render, get_object_or_404
-from rest_framework.generics import CreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 
 # ایمپورت مدل‌ها و سریالایزرهای لازم
-from .models import Friendship
+from .models import Friendship, ConsultantProfile, ConsultantRating, StudentProfile
 from .serializers import (
     RegisterSerializer, 
     UserProfileSerializer, 
     FriendUserSerializer, 
-    AddFriendSerializer
+    AddFriendSerializer,
+    ConsultantListSerializer,
+    ConsultantRatingSerializer
 )
 
 
+# ۱. ثبت‌نام (دانش‌آموز یا مشاور)
 class RegisterView(CreateAPIView):
     queryset = User.objects.all()
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
 
 
+# ۲. پروفایل کاربر جاری
 class UserProfileView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserProfileSerializer
@@ -30,33 +36,31 @@ class UserProfileView(RetrieveAPIView):
         return self.request.user
 
 
+# ۳. مدیریت دوستان (قبلی خودت)
 class FriendListAddView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    # ۱. دریافت لیست دوستان کاربر جاری
+    # دریافت لیست دوستان
     def get(self, request):
-        # دریافت شناسه تمام کاربرانی که دوست کاربر فعلی هستند
         friend_ids = Friendship.objects.filter(user=request.user).values_list('friend_id', flat=True)
         friends = User.objects.filter(id__in=friend_ids)
         
         serializer = FriendUserSerializer(friends, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    # ۲. افزودن دوست جدید با username
+    # افزودن دوست جدید
     def post(self, request):
         serializer = AddFriendSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             target_username = serializer.validated_data['username']
             target_user = get_object_or_404(User, username=target_username)
             
-            # بررسی اینکه قبلاً اضافه نشده باشد
             if Friendship.objects.filter(user=request.user, friend=target_user).exists():
                 return Response(
                     {"username": ["این کاربر قبلاً در لیست دوستان شما قرار دارد."]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # ایجاد رابطه دوستی (دو طرفه)
             Friendship.objects.create(user=request.user, friend=target_user)
             Friendship.objects.create(user=target_user, friend=request.user)
             
@@ -69,3 +73,99 @@ class FriendListAddView(APIView):
             )
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# -------------------------------------------------------------
+# 🌟 بخش‌های جدید مربوط به مشاوران
+# -------------------------------------------------------------
+
+# ۴. دریافت لیست مشاوران (همراه امتیازها و سوابق)
+class ConsultantListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ConsultantListSerializer
+
+    def get_queryset(self):
+        # دریافت کاربرانی که پروفایل مشاور دارند
+        return User.objects.filter(consultant_profile__isnull=False)
+
+
+# ۵. انتخاب یک مشاور توسط دانش‌آموز
+class SelectConsultantView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, consultant_id):
+        try:
+            consultant_profile = ConsultantProfile.objects.get(id=consultant_id)
+            student_profile = request.user.student_profile
+            
+            student_profile.consultant = consultant_profile
+            student_profile.save()
+
+            return Response(
+                {"message": f"مشاور {consultant_profile.user.get_full_name() or consultant_profile.user.username} با موفقیت انتخاب شد."},
+                status=status.HTTP_200_OK
+            )
+        except ConsultantProfile.DoesNotExist:
+            return Response({"error": "مشاور مورد نظر یافت نشد."}, status=status.HTTP_404_NOT_FOUND)
+        except StudentProfile.DoesNotExist:
+            return Response({"error": "حساب کاربری شما از نوع دانش‌آموز نیست."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ۶. ثبت یا ویرایش امتیاز دانش‌آموز به مشاور (۱ تا ۵ ستاره)
+class RateConsultantView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, consultant_id):
+        score = request.data.get('score')
+        comment = request.data.get('comment', '')
+
+        if not score or not (1 <= int(score) <= 5):
+            return Response({"error": "امتیاز باید عددی بین ۱ تا ۵ باشد."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            consultant_profile = ConsultantProfile.objects.get(id=consultant_id)
+            
+            rating, created = ConsultantRating.objects.update_or_create(
+                student=request.user,
+                consultant=consultant_profile,
+                defaults={'score': score, 'comment': comment}
+            )
+
+            msg = "امتیاز با موفقیت ثبت شد." if created else "امتیاز شما به‌روزرسانی شد."
+            return Response(
+                {
+                    "message": msg, 
+                    "new_average_rating": consultant_profile.average_rating
+                }, 
+                status=status.HTTP_200_OK
+            )
+
+        except ConsultantProfile.DoesNotExist:
+            return Response({"error": "مشاور مورد نظر یافت نشد."}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ۷. لیست دانش‌آموزانِ یک مشاور (مخصوص صفحه مشاوران)
+class ConsultantStudentsListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, 'consultant_profile'):
+            return Response({"error": "شما به عنوان مشاور وارد نشده‌اید."}, status=status.HTTP_403_FORBIDDEN)
+        
+        students = StudentProfile.objects.filter(consultant=request.user.consultant_profile)
+        students_data = [
+            {
+                "id": s.user.id,
+                "username": s.user.username,
+                "full_name": s.user.get_full_name() or s.user.username,
+                "avatar": request.build_absolute_uri(s.avatar.url) if s.avatar else None,
+                "field": s.field,
+                "parent_phone": s.parent_phone,
+            }
+            for s in students
+        ]
+        return Response(students_data, status=status.HTTP_200_OK)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
