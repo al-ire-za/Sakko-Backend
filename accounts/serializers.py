@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import StudentProfile, ConsultantProfile, ConsultantRating, Friendship
+from .models import StudentProfile, ConsultantProfile, ConsultantRating, StudentTaskFile
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 try:
@@ -21,6 +21,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     # فیلدهای مخصوص مشاور
     bio = serializers.CharField(required=False, allow_blank=True)
     phone = serializers.CharField(max_length=15, required=False, allow_blank=True)
+    
 
     class Meta:
         model = User
@@ -81,18 +82,24 @@ class UserProfileSerializer(serializers.ModelSerializer):
     bio = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 
-            'role', 'avatar', 'age', 'field', 'parent_phone', 'bio', 'phone', 'average_rating'
+            'role', 'avatar', 'age', 'field', 'parent_phone', 'bio', 'phone', 'average_rating', 'consultant'
         ]
 
     def get_role(self, obj):
         if hasattr(obj, 'consultant_profile'):
             return 'consultant'
         return 'student'
+
+    def get_consultant(self, obj):
+        if hasattr(obj, 'student_profile') and obj.student_profile.consultant:
+            return obj.student_profile.consultant.id
+        return None
 
     def get_age(self, obj):
         if hasattr(obj, 'student_profile'):
@@ -250,3 +257,23 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'is_consultant': role == 'consultant'
         }
         return data
+
+
+# ۸. سریالایزر دریافت و نمایش فایل‌های ارسالی دانش‌آموز
+class StudentTaskFileSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentTaskFile
+        fields = ['id', 'student', 'consultant', 'file', 'file_name', 'student_name', 'description', 'created_at']
+        read_only_fields = ['student', 'consultant', 'created_at']
+
+    def get_student_name(self, obj):
+        first = obj.student.first_name.strip() if obj.student.first_name else ""
+        last = obj.student.last_name.strip() if obj.student.last_name else ""
+        full = f"{first} {last}".strip()
+        return full if full else obj.student.username
+
+    def get_file_name(self, obj):
+        return obj.file.name.split('/')[-1] if obj.file else ""

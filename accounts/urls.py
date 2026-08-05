@@ -7,15 +7,14 @@ from .views import (
     SelectConsultantView, 
     RateConsultantView, 
     ConsultantStudentsListView, 
-    CustomTokenObtainPairView  # 👈 ویوی سفارشی شما
+    CustomTokenObtainPairView,
+    UploadStudentTaskView,         
+    ConsultantStudentsTasksView    
 )
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
-    
-    # 🔴 این خط اصلاح شد (جایگزینی CustomTokenObtainPairView به جای TokenObtainPairView):
     path('login/', CustomTokenObtainPairView.as_view(), name='login'), 
-    
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('me/', UserProfileView.as_view(), name='user_profile'),
     path('friends/', FriendListAddView.as_view(), name='friends-list-add'),
@@ -24,9 +23,9 @@ urlpatterns = [
     path('consultants/<int:consultant_id>/rate/', RateConsultantView.as_view(), name='rate-consultant'),
     path('consultant/my-students/', ConsultantStudentsListView.as_view(), name='consultant-my-students'),
     path('select-consultant/', SelectConsultantView.as_view(), name='select-consultant'),
-    
-    # اگر فرانت‌انداز مسیر /api/token/ هم استفاده می‌کند می‌توانید این را هم نگه دارید:
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     
-   
+    # 🌟 مسیرهای جدید اضافه شده:
+    path('upload-task/', UploadStudentTaskView.as_view(), name='upload-student-task'),
+    path('consultant-students/', ConsultantStudentsTasksView.as_view(), name='consultant-students-tasks'),
 ]

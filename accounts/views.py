@@ -6,7 +6,9 @@ from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import CustomTokenObtainPairSerializer, ConsultantListSerializer
+from .serializers import CustomTokenObtainPairSerializer, ConsultantListSerializer, StudentTaskFileSerializer, UserProfileSerializer
+from .models import StudentTaskFile
+from rest_framework.parsers import MultiPartParser, FormParser
 
 # ایمپورت مدل‌ها و سریالایزرهای لازم
 from .models import Friendship, ConsultantProfile, ConsultantRating, StudentProfile
@@ -199,3 +201,53 @@ class SelectConsultantView(APIView):
             return Response({"error": "پروفایل دانش‌آموز یافت نشد"}, status=status.HTTP_400_BAD_REQUEST)
         except ConsultantProfile.DoesNotExist:
             return Response({"error": "مشاور مورد نظر یافت نشد"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class UploadStudentTaskView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request):
+        try:
+            student_profile = request.user.student_profile
+            consultant = student_profile.consultant
+            if not consultant:
+                return Response({"error": "شما مشاور فعال ندارید."}, status=400)
+            
+            file_obj = request.FILES.get('file')
+            description = request.data.get('description', '')
+
+            task = StudentTaskFile.objects.create(
+                student=request.user,
+                consultant=consultant.user,
+                file=file_obj,
+                description=description
+            )
+            return Response({"message": "فایل با موفقیت ارسال شد."}, status=201)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+# ۲. دریافت لیست دانش‌آموزانِ مشاور + فایل‌های هر کدام
+class ConsultantStudentsTasksView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        students = StudentProfile.objects.filter(consultant__user=request.user)
+        data = []
+        for s in students:
+            files = StudentTaskFile.objects.filter(student=s.user, consultant=request.user).order_by('-created_at')
+            files_data = [{
+                'id': f.id,
+                'file_url': request.build_absolute_uri(f.file.url),
+                'file_name': f.file.name.split('/')[-1],
+                'description': f.description,
+                'created_at': f.created_at.strftime('%Y-%m-%d %H:%M')
+            } for f in files]
+
+            data.append({
+                'student_id': s.user.id,
+                'student_name': f"{s.user.first_name} {s.user.last_name}".strip() or s.user.username,
+                'field': s.field,
+                'files': files_data
+            })
+        return Response(data)
