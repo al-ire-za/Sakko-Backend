@@ -23,7 +23,10 @@ urlpatterns = [
     path('consultants/<int:consultant_id>/select/', SelectConsultantView.as_view(), name='select-consultant'),
     path('consultants/<int:consultant_id>/rate/', RateConsultantView.as_view(), name='rate-consultant'),
     path('consultant/my-students/', ConsultantStudentsListView.as_view(), name='consultant-my-students'),
+    path('select-consultant/', SelectConsultantView.as_view(), name='select-consultant'),
     
     # اگر فرانت‌انداز مسیر /api/token/ هم استفاده می‌کند می‌توانید این را هم نگه دارید:
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    
+   
 ]

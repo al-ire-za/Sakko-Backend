@@ -138,25 +138,50 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
 
-# ۳. سریالایزر لیست مشاوران (برای نمایش به دانش‌آموزان)
+# ۳. 🌟 سریالایزر لیست مشاوران (اصلاح‌شده و بدون تکرار)
 class ConsultantListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
-    bio = serializers.CharField(source='consultant_profile.bio', read_only=True)
-    phone = serializers.CharField(source='consultant_profile.phone', read_only=True)
-    average_rating = serializers.FloatField(source='consultant_profile.average_rating', read_only=True)
-    total_ratings_count = serializers.IntegerField(source='consultant_profile.total_ratings_count', read_only=True)
-    consultant_profile_id = serializers.IntegerField(source='consultant_profile.id', read_only=True)
+    short_resume = serializers.SerializerMethodField()
+    average_rating = serializers.ReadOnlyField()
+    active_students_count = serializers.ReadOnlyField()
+    max_capacity = serializers.ReadOnlyField()
+    is_full = serializers.ReadOnlyField()
+    img = serializers.SerializerMethodField()
 
     class Meta:
-        model = User
+        model = ConsultantProfile
         fields = [
-            'id', 'consultant_profile_id', 'username', 'full_name', 
-            'bio', 'phone', 'average_rating', 'total_ratings_count'
+            'id', 
+            'full_name', 
+            'short_resume', 
+            'average_rating', 
+            'active_students_count', 
+            'max_capacity', 
+            'is_full',  
+            'img'
         ]
 
     def get_full_name(self, obj):
-        name = f"{obj.first_name} {obj.last_name}".strip()
-        return name if name else obj.username
+        if obj.user:
+            first = obj.user.first_name.strip() if obj.user.first_name else ""
+            last = obj.user.last_name.strip() if obj.user.last_name else ""
+            full = f"{first} {last}".strip()
+            return full if full else obj.user.username
+        return "مشاور تحصیلی"
+
+    def get_short_resume(self, obj):
+        resume = getattr(obj, 'bio', '') or ''
+        return resume[:60] + '...' if len(resume) > 60 else resume
+
+    def get_img(self, obj):
+        request = self.context.get('request')
+        avatar_file = getattr(obj, 'avatar', None)
+        
+        if avatar_file and hasattr(avatar_file, 'url'):
+            if request:
+                return request.build_absolute_uri(avatar_file.url)
+            return avatar_file.url
+        return None
 
 
 # ۴. سریالایزر ثبت امتیاز توسط دانش‌آموز
@@ -171,7 +196,7 @@ class ConsultantRatingSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-# ۵. سریالایزر دوستان (قبلی خودت)
+# ۵. سریالایزر دوستان
 class FriendUserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     last_status = serializers.SerializerMethodField()
@@ -192,7 +217,7 @@ class FriendUserSerializer(serializers.ModelSerializer):
         return "آنلاین"
 
 
-# ۶. سریالایزر افزودن دوست (قبلی خودت)
+# ۶. سریالایزر افزودن دوست
 class AddFriendSerializer(serializers.Serializer):
     username = serializers.CharField(write_only=True)
 
@@ -210,15 +235,13 @@ class AddFriendSerializer(serializers.Serializer):
         return value
 
 
+# ۷. سریالایزر لاگین سفارشی JWT
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
-        
-        # مشخص کردن نقش کاربر
         user = self.user
         role = 'consultant' if hasattr(user, 'consultant_profile') else 'student'
         
-        # اضافه کردن اطلاعات کاربر به پاسخ لاگین
         data['user'] = {
             'id': user.id,
             'username': user.username,

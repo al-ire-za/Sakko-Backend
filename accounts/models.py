@@ -42,6 +42,7 @@ class ConsultantProfile(models.Model):
     bio = models.TextField(blank=True, verbose_name="rezomeh")
     avatar = models.ImageField(upload_to='consultants/', null=True, blank=True, verbose_name="img")
     phone = models.CharField(max_length=15, blank=True, null=True, verbose_name="Phone Number")
+    max_capacity = models.PositiveIntegerField(default=10, verbose_name="Max Student Capacity")
     created_at = models.DateTimeField(auto_now_add=True)
 
     # 🌟 متد محاسبه میانگین امتیاز مشاور
@@ -51,6 +52,10 @@ class ConsultantProfile(models.Model):
         if ratings.exists():
             return round(sum(r.score for r in ratings) / ratings.count(), 1)
         return 0.0
+
+    @property
+    def active_students_count(self):
+        return self.students.count()
 
     # تعداد کل امتیازدهندگان
     @property

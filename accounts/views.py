@@ -6,7 +6,7 @@ from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import CustomTokenObtainPairSerializer
+from .serializers import CustomTokenObtainPairSerializer, ConsultantListSerializer
 
 # ایمپورت مدل‌ها و سریالایزرهای لازم
 from .models import Friendship, ConsultantProfile, ConsultantRating, StudentProfile
@@ -169,3 +169,33 @@ class ConsultantStudentsListView(APIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+
+class ConsultantListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        consultants = ConsultantProfile.objects.all()
+        serializer = ConsultantListSerializer(consultants, many=True)
+        return Response(serializer.data)
+
+# ۲. انتخاب مشاور توسط دانش‌آموز
+class SelectConsultantView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        consultant_id = request.data.get('consultant_id')
+        try:
+            student_profile = request.user.student_profile
+            consultant = ConsultantProfile.objects.get(id=consultant_id)
+            
+            # ثبت مشاور برای دانش‌آموز
+            student_profile.consultant = consultant
+            student_profile.save()
+            
+            return Response({"message": "مشاور با موفقیت انتخاب شد"}, status=status.HTTP_200_OK)
+        except StudentProfile.DoesNotExist:
+            return Response({"error": "پروفایل دانش‌آموز یافت نشد"}, status=status.HTTP_400_BAD_REQUEST)
+        except ConsultantProfile.DoesNotExist:
+            return Response({"error": "مشاور مورد نظر یافت نشد"}, status=status.HTTP_404_NOT_FOUND)
