@@ -9,8 +9,11 @@ from .views import (
     ConsultantStudentsListView, 
     CustomTokenObtainPairView,
     UploadStudentTaskView,         
-    ConsultantStudentsTasksView    
+    ConsultantStudentsTasksView,
+    SendProgramView, 
+    MyProgramsView 
 )
+
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -21,11 +24,16 @@ urlpatterns = [
     path('consultants/', ConsultantListView.as_view(), name='consultant-list'),
     path('consultants/<int:consultant_id>/select/', SelectConsultantView.as_view(), name='select-consultant'),
     path('consultants/<int:consultant_id>/rate/', RateConsultantView.as_view(), name='rate-consultant'),
-    path('consultant/my-students/', ConsultantStudentsListView.as_view(), name='consultant-my-students'),
+    
+    # 🌟 آدرس اصلاح شده برای تطابق با فرانت‌اند:
+    path('consultant/students/', ConsultantStudentsListView.as_view(), name='consultant-students'),
+    
     path('select-consultant/', SelectConsultantView.as_view(), name='select-consultant'),
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     
-    # 🌟 مسیرهای جدید اضافه شده:
     path('upload-task/', UploadStudentTaskView.as_view(), name='upload-student-task'),
     path('consultant-students/', ConsultantStudentsTasksView.as_view(), name='consultant-students-tasks'),
+    path('send-program/', SendProgramView.as_view(), name='send-program'),
+    path('send-program/<int:program_id>/', SendProgramView.as_view(), name='delete-program'),
+    path('my-programs/', MyProgramsView.as_view(), name='my-programs'),
 ]

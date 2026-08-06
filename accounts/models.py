@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.conf import settings
 
 # ۱. پروفایل دانش‌آموز
 class StudentProfile(models.Model):
@@ -115,3 +116,28 @@ class StudentTaskFile(models.Model):
 
     def __str__(self):
         return f"{self.student.username} -> {self.consultant.username}"
+
+
+class ConsultantProgram(models.Model):
+    consultant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sent_programs",
+        verbose_name="مشاور"
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="received_programs",
+        verbose_name="دانش‌آموز"
+    )
+    title = models.CharField(max_length=255, verbose_name="عنوان برنامه")
+    description = models.TextField(blank=True, null=True, verbose_name="توضیحات")
+    file = models.FileField(upload_to="consultant_programs/", verbose_name="فایل برنامه")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاریخ ارسال")
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} - {self.student.username}"

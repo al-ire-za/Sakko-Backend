@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import StudentProfile, ConsultantProfile, ConsultantRating, StudentTaskFile
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import ConsultantProgram
 
 try:
     from tracker.models import StudySession
@@ -277,3 +278,20 @@ class StudentTaskFileSerializer(serializers.ModelSerializer):
 
     def get_file_name(self, obj):
         return obj.file.name.split('/')[-1] if obj.file else ""
+
+
+
+
+class ConsultantProgramSerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M", read_only=True)
+    student_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsultantProgram
+        fields = ['id', 'title', 'description', 'student_name', 'file', 'created_at']
+
+    def get_student_name(self, obj):
+        if obj.student:
+            full_name = obj.student.get_full_name()
+            return full_name if full_name.strip() else obj.student.username
+        return "دانش‌آموز نامشخص"
