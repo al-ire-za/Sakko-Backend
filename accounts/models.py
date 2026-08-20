@@ -63,6 +63,10 @@ class ConsultantProfile(models.Model):
     def total_ratings_count(self):
         return self.ratings.count()
 
+    @property
+    def is_full(self):
+        return self.active_students_count >= self.max_capacity
+
     class Meta:
         verbose_name = "Consultant Profile"
         verbose_name_plural = "Consultant Profiles"

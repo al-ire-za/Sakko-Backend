@@ -1,12 +1,13 @@
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth import get_user_model
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView
+from rest_framework.generics import CreateAPIView, RetrieveUpdateAPIView, ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
+
 
 # ایمپورت مدل‌ها
 from .models import (
@@ -41,13 +42,15 @@ class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
 
 
-# ۲. پروفایل کاربر جاری
-class UserProfileView(RetrieveAPIView):
+# ۲. پروفایل کاربر جاری (مشاهده و ویرایش)
+class UserProfileView(RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = UserProfileSerializer
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_object(self):
         return self.request.user
+
 
 
 # ۳. مدیریت دوستان
@@ -228,9 +231,10 @@ class ConsultantStudentsTasksView(APIView):
             files = StudentTaskFile.objects.filter(student=s.user, consultant=request.user).order_by('-created_at')
             files_data = [{
                 'id': f.id,
-                'file_url': request.build_absolute_uri(f.file.url),
-                'file_name': f.file.name.split('/')[-1],
-                'description': f.description,
+                'file': request.build_absolute_uri(f.file.url) if f.file else '',
+                'file_url': request.build_absolute_uri(f.file.url) if f.file else '',
+                'file_name': f.file.name.split('/')[-1] if f.file else '',
+                'description': f.description or '',
                 'created_at': f.created_at.strftime('%Y-%m-%d %H:%M') if hasattr(f, 'created_at') and f.created_at else ''
             } for f in files]
 
@@ -241,6 +245,7 @@ class ConsultantStudentsTasksView(APIView):
                 'files': files_data
             })
         return Response(data, status=status.HTTP_200_OK)
+
 
 
 # ۱۱. ارسال برنامه هفتگی توسط مشاور به دانش‌آموز

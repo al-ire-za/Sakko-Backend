@@ -2,7 +2,8 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import StudentProfile, ConsultantProfile, ConsultantRating, Friendship
+from .models import StudentProfile, ConsultantProfile, ConsultantRating, Friendship, StudentTaskFile, ConsultantProgram
+
 
 
 # ==========================================
@@ -211,10 +212,24 @@ class FriendshipAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'friend__username')
 
 
+@admin.register(StudentTaskFile)
+class StudentTaskFileAdmin(admin.ModelAdmin):
+    list_display = ('student', 'consultant', 'file', 'created_at')
+    search_fields = ('student__username', 'consultant__username', 'description')
+    list_filter = ('created_at',)
+
+
+@admin.register(ConsultantProgram)
+class ConsultantProgramAdmin(admin.ModelAdmin):
+    list_display = ('title', 'consultant', 'student', 'created_at')
+    search_fields = ('title', 'consultant__username', 'student__username')
+    list_filter = ('created_at',)
+
+
 # آن‌رجیستر کردن User قبلی و ثبت CustomUserAdmin
 try:
     admin.site.unregister(User)
 except admin.sites.NotRegistered:
     pass
 
-admin.site.register(User, CustomUserAdmin)
+admin.site.register(User, CustomUserAdmin)

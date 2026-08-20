@@ -41,7 +41,8 @@ class DailySleepLog(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sleep_logs', verbose_name="User")
     sleep_time = models.TimeField(verbose_name="Sleep Time")
     wake_time = models.TimeField(verbose_name="Wake Time")
-    date = models.DateField(auto_now_add=True, verbose_name="Date")
+    date = models.DateField(default=timezone.localdate, verbose_name="Date")
+
 
     class Meta:
         unique_together = ('user', 'date')

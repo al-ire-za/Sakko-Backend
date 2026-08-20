@@ -73,15 +73,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-# ۲. سریالایزر پروفایل کاربر متصل (دریافت اطلاعات خود کاربر)
+# ۲. سریالایزر پروفایل کاربر متصل (دریافت و ویرایش اطلاعات خود کاربر)
 class UserProfileSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
-    avatar = serializers.SerializerMethodField()
-    age = serializers.SerializerMethodField()
-    field = serializers.SerializerMethodField()
-    parent_phone = serializers.SerializerMethodField()
-    bio = serializers.SerializerMethodField()
-    phone = serializers.SerializerMethodField()
+    avatar = serializers.ImageField(required=False, allow_null=True)
+    age = serializers.IntegerField(required=False, allow_null=True)
+    field = serializers.CharField(required=False, allow_blank=True)
+    parent_phone = serializers.CharField(required=False, allow_blank=True)
+    bio = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
     average_rating = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
 
@@ -91,6 +91,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name', 
             'role', 'avatar', 'age', 'field', 'parent_phone', 'bio', 'phone', 'average_rating', 'consultant'
         ]
+        read_only_fields = ['id', 'username']
 
     def get_role(self, obj):
         if hasattr(obj, 'consultant_profile'):
@@ -102,48 +103,85 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return obj.student_profile.consultant.id
         return None
 
-    def get_age(self, obj):
-        if hasattr(obj, 'student_profile'):
-            return obj.student_profile.age
-        return None
-
-    def get_field(self, obj):
-        if hasattr(obj, 'student_profile'):
-            return obj.student_profile.field
-        return None
-
-    def get_parent_phone(self, obj):
-        if hasattr(obj, 'student_profile'):
-            return obj.student_profile.parent_phone
-        return None
-
-    def get_bio(self, obj):
-        if hasattr(obj, 'consultant_profile'):
-            return obj.consultant_profile.bio
-        return None
-
-    def get_phone(self, obj):
-        if hasattr(obj, 'consultant_profile'):
-            return obj.consultant_profile.phone
-        return None
-
     def get_average_rating(self, obj):
         if hasattr(obj, 'consultant_profile'):
             return obj.consultant_profile.average_rating
         return None
-    
-    def get_avatar(self, obj):
-        request = self.context.get('request')
-        avatar_file = None
-        
-        if hasattr(obj, 'student_profile') and obj.student_profile.avatar:
-            avatar_file = obj.student_profile.avatar
-        elif hasattr(obj, 'consultant_profile') and obj.consultant_profile.avatar:
-            avatar_file = obj.consultant_profile.avatar
 
-        if avatar_file and request:
-            return request.build_absolute_uri(avatar_file.url)
-        return None
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+
+        if hasattr(instance, 'student_profile'):
+            sp = instance.student_profile
+            data['age'] = sp.age
+            data['field'] = sp.field
+            data['parent_phone'] = sp.parent_phone
+            if sp.avatar and request:
+                data['avatar'] = request.build_absolute_uri(sp.avatar.url)
+            elif sp.avatar:
+                data['avatar'] = sp.avatar.url
+            else:
+                data['avatar'] = None
+        elif hasattr(instance, 'consultant_profile'):
+            cp = instance.consultant_profile
+            data['bio'] = cp.bio
+            data['phone'] = cp.phone
+            if cp.avatar and request:
+                data['avatar'] = request.build_absolute_uri(cp.avatar.url)
+            elif cp.avatar:
+                data['avatar'] = cp.avatar.url
+            else:
+                data['avatar'] = None
+
+        return data
+
+    def update(self, instance, validated_data):
+        has_age = 'age' in validated_data
+        age = validated_data.pop('age', None)
+
+        has_field = 'field' in validated_data
+        field = validated_data.pop('field', None)
+
+        has_parent_phone = 'parent_phone' in validated_data
+        parent_phone = validated_data.pop('parent_phone', None)
+
+        has_bio = 'bio' in validated_data
+        bio = validated_data.pop('bio', None)
+
+        has_phone = 'phone' in validated_data
+        phone = validated_data.pop('phone', None)
+
+        has_avatar = 'avatar' in validated_data
+        avatar = validated_data.pop('avatar', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if hasattr(instance, 'student_profile'):
+            sp = instance.student_profile
+            if has_age:
+                sp.age = age
+            if has_field:
+                sp.field = field
+            if has_parent_phone:
+                sp.parent_phone = parent_phone
+            if has_avatar:
+                sp.avatar = avatar
+            sp.save()
+        elif hasattr(instance, 'consultant_profile'):
+            cp = instance.consultant_profile
+            if has_bio:
+                cp.bio = bio
+            if has_phone:
+                cp.phone = phone
+            if has_avatar:
+                cp.avatar = avatar
+            cp.save()
+
+        return instance
+
 
 
 # ۳. 🌟 سریالایزر لیست مشاوران (اصلاح‌شده و بدون تکرار)
@@ -249,15 +287,42 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         user = self.user
         role = 'consultant' if hasattr(user, 'consultant_profile') else 'student'
+        raw_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        full_name = raw_name if raw_name else user.username
         
-        data['user'] = {
+        user_data = {
             'id': user.id,
             'username': user.username,
             'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'full_name': full_name,
+            'fullName': full_name,
             'role': role,
             'is_consultant': role == 'consultant'
         }
+
+        if role == 'consultant' and hasattr(user, 'consultant_profile'):
+            cp = user.consultant_profile
+            user_data.update({
+                'bio': cp.bio,
+                'phone': cp.phone,
+                'max_capacity': cp.max_capacity,
+                'average_rating': cp.average_rating,
+            })
+        elif hasattr(user, 'student_profile'):
+            sp = user.student_profile
+            user_data.update({
+                'age': sp.age,
+                'field': sp.field,
+                'parent_phone': sp.parent_phone,
+                'parentPhone': sp.parent_phone,
+                'consultant': sp.consultant.id if sp.consultant else None,
+            })
+
+        data['user'] = user_data
         return data
+
 
 
 # ۸. سریالایزر دریافت و نمایش فایل‌های ارسالی دانش‌آموز
